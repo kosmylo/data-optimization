@@ -94,15 +94,16 @@ curl "http://127.0.0.1:5000/schedule?soc-start=20&soc-max=90&soc-min=10&soc-targ
 
 **Error Handling**:
 
-- If the parameters are invalid, the API will return a 400 status code with a JSON error message.
-- If an unexpected error occurs, the API will return a 500 status code.
+- If a **`ValueError`** is encountered (e.g., due to invalid input parameters like an infeasible SoC target), the API will return a `400` status code with a JSON error message explaining the specific issue.
+- If a **`RuntimeError`** occurs (e.g., due to issues during the optimization process), the API will return a `500` status code with a JSON error message detailing the problem.
+- If any other unexpected exception occurs, the API will return a `500` status code with a generic JSON error message indicating that an unexpected error occurred.
 
 ## Running Tests
 
 To run the unit tests and API tests, execute:
 
 ```bash
-./run_tests.sh
+bash ./run_tests.sh
 ```
 
 This will run all the tests defined in test_scheduler.py and test_api.py.
@@ -111,4 +112,4 @@ This will run all the tests defined in test_scheduler.py and test_api.py.
 
 When the top-up parameter is set to true, the API will aim to charge the battery to its full storage capacity by the end of the schedule. This feature is particularly useful when you want to ensure the battery is fully charged for a future period of expected high demand.
 
-If top-up is false, the battery will aim to reach the soc-target defined by the user, but it will not necessarily try to reach full capacity.
+If top-up is false, the battery will aim to reach the soc-target defined by the user, but it will not try to reach full capacity.

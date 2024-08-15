@@ -17,7 +17,7 @@ from pyomo.environ import value
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 def compute_soc_schedule(power_schedule: list[float], soc_start: float, conversion_efficiency: float) -> list[float]:
-    """Determine the scheduled state of charge (SoC), given a power schedule and a starting SoC.
+    """Determine the scheduled state of charge (SoC), given a power schedule, a starting SoC and the conversion efficiency.
 
     :param power_schedule:          List of power changes (positive for charging, negative for discharging).
     :param soc_start:               Initial state of charge at the beginning of the schedule.
