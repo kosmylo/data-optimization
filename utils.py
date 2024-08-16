@@ -14,6 +14,7 @@ from pyomo.core import (
     minimize
 )
 from pyomo.environ import value
+
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 def compute_soc_schedule(power_schedule: list[float], soc_start: float, conversion_efficiency: float) -> list[float]:
@@ -89,6 +90,9 @@ def schedule_battery(
     model.device_max = Param(model.j, initialize=soc_max)
     model.device_min = Param(model.j, initialize=soc_min)
 
+    # Auxiliary variable to capture excess over soc-max
+    model.excess_soc = Var(model.j, domain=NonNegativeReals, initialize=0)
+
     def ems_derivative_bounds(m, j):
         return (
             -power_capacity,
@@ -114,11 +118,11 @@ def schedule_battery(
                     storage_capacity,
                 )
             else:
-                # During other times, SoC should be below 90% of the storage capacity
+                # Allow SoC to go up to storage_capacity during the schedule
                 return (
                     m.device_min[j],
                     soc_start + sum(stock_changes),
-                    m.device_max[j],
+                    storage_capacity,
                 )
         else:   
             # Apply soc target and bounds when top_up is false
@@ -148,15 +152,38 @@ def schedule_battery(
     model.device_power_equalities = Constraint(model.j, rule=device_derivative_equalities)
     model.device_energy_bounds = Constraint(model.j, rule=device_bounds)
 
+    def excess_soc_constraint(m, j):
+        stock_changes = sum(
+            m.device_power_down[k] / conversion_efficiency  
+            + m.device_power_up[k] * conversion_efficiency 
+            for k in range(0, j + 1)
+        )
+        soc_current = soc_start + stock_changes
+        # Ensure excess_soc is at least soc_current - m.device_max[j]
+        return m.excess_soc[j] >= soc_current - m.device_max[j]
+
+    model.excess_soc_constraint_lower = Constraint(model.j, rule=excess_soc_constraint)
+
     # Add objective
     def cost_function(m):
+        """Calculate the actual costs associated with charging/discharging."""
         costs = 0
         for j in m.j:
             costs += m.device_power_down[j] * m.down_price[j]
             costs += m.device_power_up[j] * m.up_price[j]
         return costs
+    
+    # Define the penalty function
+    def penalty_function(m):
+        penalty_factor = 1000  # Arbitrary penalty factor
+        penalty = penalty_factor * sum(m.excess_soc[j] for j in m.j)
+        return penalty
 
-    model.costs = Objective(rule=cost_function, sense=minimize)
+    model.costs = cost_function(model)
+    model.penalty = penalty_function(model)
+
+    # The objective is to minimize both actual costs and penalties
+    model.obj = Objective(expr=model.costs + model.penalty, sense=minimize)
     solver = SolverFactory("appsi_highs")
     results = solver.solve(model, load_solutions=False)
     print(results.solver.termination_condition)
