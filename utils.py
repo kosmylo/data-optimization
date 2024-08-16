@@ -122,7 +122,7 @@ def schedule_battery(
                 return (
                     m.device_min[j],
                     soc_start + sum(stock_changes),
-                    storage_capacity,
+                    100,
                 )
         else:   
             # Apply soc target and bounds when top_up is false
